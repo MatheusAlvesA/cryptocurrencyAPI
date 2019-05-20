@@ -10,7 +10,7 @@ if(array_key_exists('search', $_GET)) { // Rquisição de nome das moedas
 	if(!array_key_exists('moeda', $_GET)) // A moeda não foi informada
 		retornarJSON(['erro' => 'Informe a moeda'], 400); // Bad Request
 
-	moeda($_GET['moeda']);
+	moeda($_GET['moeda'], $_GET['historico'] == 'true');
 }
 
 /*
@@ -31,7 +31,7 @@ function search() {
 /*
 	Retorna via Rest infos a respeito da moeda solicitada
 */
-function moeda(String $moeda) {
+function moeda(String $moeda, Bool $historico) {
 	$ch = curl_init('https://graphs2.coinmarketcap.com/currencies/'.$moeda); // iniciando curl
 
 	curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true); // Siga os redirecionamentos que o servidor solicitar
@@ -46,7 +46,11 @@ function moeda(String $moeda) {
 	}
 
 	curl_close($ch);
-	$dados = processarMoeda(json_decode($dados, true)); // Processando dados obtidos
+
+	if(!$historico)
+		$dados = processarMoedaMinificar(json_decode($dados, true)); // Processando e removendo dados históricos obtidos
+	else
+		$dados = processarMoeda(json_decode($dados, true)); // Processando dados obtidos
 
 	retornarJSON($dados);
 }
@@ -85,6 +89,29 @@ function processarMoeda($dados) {
 		]);
 	}
 	$dados['volume'] = $volume;
+
+	// Removendo infos desnecessárias
+	unset($dados['price_usd']);
+	unset($dados['volume_usd']);
+	unset($dados['market_cap_by_available_supply']);
+
+	return $dados;
+}
+
+/*
+	Processa os dados obtidos a respeito de uma moeda
+	retorna a cotação da moeda convertida e BRL
+*/
+function processarMoedaMinificar($dados) {
+	global $cotacao; // Obtendo cotação do escopo global
+
+	$dados['price'] = end($dados['price_usd']); // Obtendo apenas a cotação mais recente
+	$dados['price'][1] = $dados['price'][1] * $cotacao; // Convertendo USD -> BRL
+
+	$dados['volume'] = end($dados['volume_usd']); // Obtendo apenas o volume mais recente
+	$dados['volume'][1] = $dados['volume'][1] * $cotacao; // Convertendo USD -> BRL
+
+	$dados['price_btc'] = end($dados['price_btc']); // Obtendo apenas o equivalente mais recente em BTC
 
 	// Removendo infos desnecessárias
 	unset($dados['price_usd']);
