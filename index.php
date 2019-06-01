@@ -17,9 +17,7 @@ if(array_key_exists('search', $_GET)) { // Rquisição de nome das moedas
 	Retorna via Rest uma lista das moedas disponíveis
 */
 function search() {
-	// Obtendo lista completa da API do coinmarketcap
-	$bruto = file_get_contents('https://s2.coinmarketcap.com/generated/search/quick_search.json');
-	$dados = json_decode($bruto, true); // Parseando JSON
+	$dados = getLista();
 
 	for($i = 0; $i < count($dados); $i++) { // Removendo info desnecessária
 		unset($dados[$i]['tokens']);
@@ -28,11 +26,27 @@ function search() {
 	retornarJSON($dados);
 }
 
+// Obtém lista completa da API do coinmarketcap
+function getLista() {
+	$bruto = file_get_contents('https://s2.coinmarketcap.com/generated/search/quick_search.json');
+	return json_decode($bruto, true); // Parseando JSON
+}
+
+function getMetaDados($slug) {
+	$lista = getLista();
+	foreach ($lista as $key => $valor) {
+		if($valor["slug"] === $slug)
+			return $valor;
+	}
+	return null;
+}
+
 /*
 	Retorna via Rest infos a respeito da moeda solicitada
 */
 function moeda(String $moeda, Bool $historico) {
 	$ch = curl_init('https://graphs2.coinmarketcap.com/currencies/'.$moeda); // iniciando curl
+	$metaDados = getMetaDados($moeda);
 
 	curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true); // Siga os redirecionamentos que o servidor solicitar
 	curl_setopt($ch, CURLOPT_RETURNTRANSFER , true); // Retorne os dados ao executar
@@ -51,6 +65,10 @@ function moeda(String $moeda, Bool $historico) {
 		$dados = processarMoedaMinificar(json_decode($dados, true)); // Processando e removendo dados históricos obtidos
 	else
 		$dados = processarMoeda(json_decode($dados, true)); // Processando dados obtidos
+
+	// Adicionando meta dados
+	$dados["nome"] = $metaDados["name"];
+	$dados["id"] = $metaDados["id"];
 
 	retornarJSON($dados);
 }
